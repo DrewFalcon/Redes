@@ -5,9 +5,9 @@
 	2020 EPS-UAM
 '''
 
-from ethernet import *
-from arp import *
-from ethmsg import *
+from P2.ethernet import *
+from P2.arp import *
+from P2.ethmsg import *
 import sys
 import binascii
 import signal
@@ -24,7 +24,7 @@ def printHelp():
 	print ( "\ta <direccionIP> : Solicita ARP Request sobre la IP indicada\n")
 	print ( "\tp : Imprime cache ARP\n")
 	print ( "\th : Muestra la ayuda\n")
-	#TODO g : ARP gratuito
+	print ( "\tg : Comprobar IP duplicada con ARP gratuito\n")
 	print ( "\tq : Salir del programa\n")
 
 
@@ -52,7 +52,7 @@ if __name__ == "__main__":
 	if (startEthernetLevel(args.interface) != 0):
 		logging.error('Ethernet no inicializado')
 		sys.exit(-1)
-	# TODO iniciar nivel EthMsg
+	initEthMsg(args.interface)
 	#Inicializamos ARP. Si no podemos inicializar salimos.
 	if initARP(args.interface) == -1:
 		logging.error('ARP no inicializado')
@@ -99,8 +99,18 @@ if __name__ == "__main__":
 				mensaje = " ".join(partes[1:]) # vuelve a generar el mensaje tras quitar la m
 				print(f"Enviando mensaje de {len(mensaje)} Bytes: {mensaje}")
 				# Aquí puedes llamar a una función que maneje el envío de mensajes
-				sendEthMsg(mensaje)
-			#TODO ARP gratuito
+				try:
+					sendEthMsg(mensaje.encode('ascii'))
+				except UnicodeEncodeError:
+					print('Solo se permiten mensajes ASCII')
+			elif comando == 'g':
+				resultado = gratuitousARP()
+				if resultado == 1:
+					print('IP duplicada detectada')
+				elif resultado == 0:
+					print('No se ha detectado IP duplicada')
+				else:
+					print('Error enviando ARP gratuito')
 			else:
 				print("Comando no reconocido. 'h' para ayuda.\n")
 		except KeyboardInterrupt:

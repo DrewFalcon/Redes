@@ -7,7 +7,7 @@
 
 
 
-from ethernet import *
+from P2.ethernet import *
 import logging
 import socket
 import struct
@@ -36,6 +36,9 @@ awaitingResponse = False
 cacheLock = Lock()
 #Caché de ARP. Es un diccionario similar al estándar de Python solo que eliminará las entradas a los 10 segundos
 cache = ExpiringDict(max_len=100, max_age_seconds=10)
+myIP = None
+myMAC = None
+arpInitialized = False
 
 
 
@@ -89,10 +92,10 @@ def processARPRequest(data:bytes,MAC:bytes)->None:
             -MAC: dirección MAC origen extraída por el nivel Ethernet
         Retorno: Ninguno
     '''
-    logging.debug('Función no implementada')
-    #TODO implementar aquí
 
     # Si MAC origen no es el del Ethernet retornar
+    if len(data) < 28:
+        return
     mac_origin = data[8:14]
     if mac_origin != MAC:
         return
@@ -106,7 +109,7 @@ def processARPRequest(data:bytes,MAC:bytes)->None:
     if ip_destination != myIP:
         return
 
-    if ip_origin == myIP:
+    if mac_origin == myMAC:
         return
 
     reply = createARPReply(ip_origin, mac_origin)
@@ -142,10 +145,10 @@ def processARPReply(data:bytes,MAC:bytes)->None:
         Retorno: Ninguno
     '''
     global requestedIP,resolvedMAC,awaitingResponse,cache
-    logging.debug('Función no implentada')    
-    #TODO implementar aquí
 
     # Si MAC origen no es el del Ethernet retornar
+    if len(data) < 28:
+        return
     mac_origin = data[8:14]
     if mac_origin != MAC:
         return
@@ -156,7 +159,7 @@ def processARPReply(data:bytes,MAC:bytes)->None:
     ip_destination = struct.unpack('!I', data[24:28])[0]
 
     # comprobar IP destino con propia IP
-    if myIP != ip_destination:
+    if myIP != ip_destination or mac_target != myMAC or mac_origin == myMAC:
         return
 
     with globalLock:
@@ -169,8 +172,9 @@ def processARPReply(data:bytes,MAC:bytes)->None:
         awaitingResponse = False
         requestedIP = None
 
-    with cacheLock:
-        cache[ip_origin] = mac_origin
+    if ip_origin != myIP:
+        with cacheLock:
+            cache[ip_origin] = mac_origin
 
     
 
@@ -292,56 +296,50 @@ def initARP(interface:str) -> int:
             -Marcar la variable de nivel ARP inicializado a True
     '''
     global myIP,myMAC,arpInitialized
-    #logging.debug('Función no implementada')
-    #TODO implementar aquí
-
-    #if arpInitialized:
-    if globals().get('arpInitialized', False):
+    if arpInitialized:
         return -1
-
-    # usar funciones ethernet.py
     myMAC = getHwAddr(interface)
-    myIP  = getIP(interface)
-
+    myIP = getIP(interface)
     registerEthCallback(process_arp_frame, 0x0806)
 
-    # Añadir Mac propio al cache
+    # Comprobar primero que ningún otro equipo tiene nuestra IP.
+    if gratuitousARP() != 0:
+        return -1
     with cacheLock:
         cache[myIP] = myMAC
+    arpInitialized = True
+    return 0
 
 
-    # Realizar una o 3 peticiones ARP gratuitas?
+def gratuitousARP():
+    """Devuelve 1 si hay IP duplicada, 0 si no, y -1 si falla el envío."""
+    global requestedIP, awaitingResponse, resolvedMAC
+    if myIP is None or myMAC is None:
+        return -1
     with globalLock:
-        # preparar
         requestedIP = myIP
         awaitingResponse = True
         resolvedMAC = None
 
-    returnable = False
+    resultado = 0
     for i in range(3):
         request = createARPRequest(myIP)
-        sendEthernetFrame(request, len(request), 0x0806, broadcastAddr)
+        if sendEthernetFrame(request, len(request), 0x0806, broadcastAddr) != 0:
+            resultado = -1
+            break
         time.sleep(1)
-
-        
         with globalLock:
             if not awaitingResponse:
                 if resolvedMAC != myMAC:
-                    #return -1
-                    returnable = True
-                    break
-                awaitingResponse = True
-                resolvedMAC = None
+                    resultado = 1
+                break
 
     with globalLock:
-            awaitingResponse = False
-            requestedIP      = None
-    if returnable:
-        return -1
+        awaitingResponse = False
+        requestedIP = None
+        resolvedMAC = None
+    return resultado
 
-    arpInitialized = True
-
-    return 0
 
 def ARPResolution(ip:int) -> bytes:
     '''
@@ -396,7 +394,8 @@ def ARPResolution(ip:int) -> bytes:
 
 
         request = createARPRequest(ip)
-        sendEthernetFrame(request, len(request), 0x0806, broadcastAddr)
+        if sendEthernetFrame(request, len(request), 0x0806, broadcastAddr) != 0:
+            break
         time.sleep(1)
 
             

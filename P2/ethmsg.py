@@ -5,7 +5,7 @@
     2024 EPS-UAM
 '''
 
-from ethernet import *
+from P2.ethernet import *
 import logging
 import socket
 import struct
@@ -14,7 +14,7 @@ import time
 from threading import Lock
 from expiringdict import ExpiringDict
 
-ETHTYPE = 0x3003
+ETHTYPE = 0x0AA0
 #Dirección de difusión (Broadcast)
 broadcast = bytes([0xFF]*6)
 
@@ -37,8 +37,16 @@ def process_ethMsg_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac
             -srcMac: MAC origen de la trama Ethernet que se ha recibido
         Retorno: Ninguno
     '''
-    logging.debug('EthMsg: Función no implementada')
-    #TODO implementar aquí
+    if len(data) < 2:
+        return
+    length = struct.unpack('!H', data[0:2])[0]
+    if len(data) < 2 + length:
+        return
+    mensaje = data[2:2+length].decode('ascii', errors='replace')
+    mac = ':'.join('{:02X}'.format(b) for b in srcMac)
+    fecha = time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(header.ts.tv_sec))
+    print('[{}.{:06d}] {} ({} bytes): {}'.format(
+        fecha, header.ts.tv_usec, mac, length, mensaje))
 
 
 
@@ -50,11 +58,10 @@ def initEthMsg(interface:str) -> int:
         Argumentos:   
 			interfaz
     '''
-    logging.debug('EthMsg: Función no implementada')
-    #TODO implementar aquí
+    registerEthCallback(process_ethMsg_frame, ETHTYPE)
     return 0
 
-def sendEthMsg(message:bytes) -> bytes:
+def sendEthMsg(message:bytes):
     '''
         Nombre: sendEthMsg
         Descripción: Esta función mandara un mensaje en broacast 
@@ -71,6 +78,9 @@ def sendEthMsg(message:bytes) -> bytes:
                 
           
     '''
-    logging.debug('EthMsg: Función no implementada')
-    #TODO implementar aquí
+    if len(message) > 1498:  # 1500 bytes de payload Ethernet menos 2 de longitud
+        return None
+    datos = struct.pack('!H', len(message)) + message
+    if sendEthernetFrame(datos, len(datos), ETHTYPE, broadcast) == 0:
+        return len(message)
     return None
