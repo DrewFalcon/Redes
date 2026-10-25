@@ -1,61 +1,77 @@
 PRACTICA 2 - REDES DE COMUNICACIONES - UAM
-Autores: Carlos Mendez & Andrés Falcón
-Grupo:
-Pareja:
 
-Criterios de Evaluación 
+Autores: Carlos Mendez & Andrés Falcón  
+Grupo: 1311
+Pareja: 4
+
+Criterios de Evaluación
 ----------------------------------------------------------------------------
 
 1. Recibir tramas Ethernet, realizar comprobaciones y llamar correctamente a la función de callback de nivel superior:
     - REALIZADO
-    - Si el Ethertype está en EthernetProtocols, se llama al callback con el header, us, srcMac enviado y el payload
+    - En process_Ethernet_frame se extraen la MAC destino, MAC origen y el EtherType.
+    - Se comprueba que la MAC destino sea la propia o la de broadcast. Si el EtherType está en EthernetProtocols, se llama al callback correspondiente con us, header, payload y srcMac.
+    - Comprobado mediante la recepción de mensajes y paquetes ARP entre h1 y h2 usando Mininet y Wireshark.
 
-2. Enviar tramas Ethernet  correctamente:
+2. Enviar tramas Ethernet correctamente:
     - REALIZADO
-    - En sendEthernetFrame se construye la trama con los valores dstMac + myMAC + Ethertype + 
-    - Envía dicha trama con pcap_inject y comprueba que el tamaño de la trama es igual al número de bytes transmitidos
+    - En sendEthernetFrame se construye la trama con los valores dstMac + macAddress + EtherType + payload.
+    - Se comprueba que la trama cumpla los límites de Ethernet, añadiendo padding con ceros si es menor de 60 bytes y devolviendo error si supera los 1514 bytes.
+    - Se envía dicha trama con pcap_inject y se comprueba que el número de bytes transmitidos sea el esperado.
+    - Se ha comprobado con Wireshark que las tramas tienen el formato y tamaño correctos. También se ha probado que una trama de 1515 bytes es rechazada.
 
 3. Imprimir mensajes sobre el protocolo 0x0AA0:
     - REALIZADO
-    - en la función process_ethMsg_frame se lee la longitud del mensaje y se extrae de data
-    - Se imprime el mensaje obtenido con la fecha y hora más su header.ts, la MAC origen y la longitud
+    - En la función process_ethMsg_frame se lee la longitud del mensaje de los dos primeros bytes y se extrae el contenido de data.
+    - Se imprime el mensaje obtenido con la fecha y hora de recepción (header.ts), la MAC origen y la longitud en bytes.
+    - En sendEthMsg se añade la longitud del mensaje en orden de red y se envía en broadcast mediante Ethernet.
+    - Se ha comprobado enviando mensajes desde h1 y recibiéndolos correctamente en h2. También se ha comprobado en Wireshark el EtherType 0x0AA0 y el contenido de la trama.
 
-4. Enviar correctamente peticiones ARP: 
+4. Enviar correctamente peticiones ARP:
     - REALIZADO
-    - en createARPRequest de arp.py, se devuelve una petición con el opcode 0x001 para llamar a ARPRequest, y los valores Ip y MAC del ordenador que envía la petición
-    - el MAC a buscar se implementa inicializado a 0 (al ser desconocido)
-    - se envían de manera broadcast con el Ethertype 0x0806
-    - ARPResolution hace hasta 3 peticiones ARP gratuito
+    - En createARPRequest de arp.py se construye una petición con opcode 0x0001, incluyendo los valores IP y MAC del ordenador que envía la petición y la IP que se quiere resolver.
+    - La MAC destino dentro de ARP se inicializa a 0, al ser desconocida.
+    - Se envían las peticiones en broadcast con EtherType 0x0806.
+    - ARPResolution comprueba primero la caché y, si no encuentra la IP, realiza hasta 3 peticiones ARP.
+    - Se ha comprobado con Wireshark que las peticiones se envían correctamente. También se ha probado una IP inexistente (10.0.0.99), comprobando los 3 intentos y que finalmente se indica que la dirección no se ha encontrado.
 
-5. Procesar correctamente peticiones ARP recibidas: 
+5. Procesar correctamente peticiones ARP recibidas:
     - REALIZADO
-    - en processARPRequest, se extrae el IPdestino, IP y MAC origen; Y si todo está en orden se envía la petición con sendEthernetFrame después de haber llamado a createReply
-    - en createARPReply, se asigna al opcode 0x002 y se crea una respuesta con createARPRequest que enviará al solicitante
-    
+    - En process_arp_frame se comprueba la cabecera ARP y el opcode para distinguir entre Request y Reply.
+    - En processARPRequest se extraen la IP destino, IP y MAC origen. Se comprueba que la MAC origen coincida con la de Ethernet y que la IP solicitada sea la propia.
+    - Si todo está en orden, se construye una respuesta llamando a createARPReply y se envía mediante sendEthernetFrame.
+    - Se ha comprobado con Wireshark que nuestro programa responde a las peticiones ARP recibidas, además de la respuesta automática del sistema operativo.
 
 6. Enviar correctamente respuestas ARP:
     - REALIZADO
-    - en createARPReply, se crea una petición con opcode 0x002 y su IP+MAC más el IP y MAC del solicitante que se dieron como el nuevo target
+    - En createARPReply se crea una respuesta con opcode 0x0002, incluyendo la IP y MAC propias, más la IP y MAC del solicitante que se asignan como nuevo destino.
+    - La respuesta se envía en unicast a la MAC del solicitante.
+    - Se ha comprobado con Wireshark que se envían las respuestas correctamente, con una longitud de 60 bytes incluyendo el padding de Ethernet.
 
-
-7. Procesar correctamente respuestas ARP :
+7. Procesar correctamente respuestas ARP:
     - REALIZADO
-    - processARPReply actualiza el MAC destino, después de haber comprobado que los IP/MAC origen y destino no causarán conflictos
-    - Añade el MAC resuelto al cache, actualiza el awaitingResponse a False y el requestedIP a None
+    - En processARPReply se comprueba que la MAC origen del paquete ARP coincida con la recibida de Ethernet y que la respuesta corresponda a la IP solicitada.
+    - Se guarda la MAC obtenida en resolvedMAC y se añade la asociación IP/MAC a la caché.
+    - Se actualiza awaitingResponse a False y requestedIP a None.
+    - Se utiliza globalLock para proteger las variables compartidas entre hilos.
+    - Se ha comprobado solicitando desde h1 la IP de h2 y obteniendo correctamente su dirección MAC.
 
-    
-8. Manejo correcto de la caché ARP
+8. Manejo correcto de la caché ARP:
     - REALIZADO
-    - se ha usado la sentencia "with x:" para bloquear temporalmente otros procesos e hilos cuando se quiere modificar una variable global, protegiendo la estructura de conflictos
-    - en particular, se utilizó "with cachelock" para que no hayan conflictos al modificar el caché de Ip/MAC's 
+    - Se utiliza ExpiringDict para almacenar las asociaciones IP/MAC, con un tiempo de caducidad de 10 segundos.
+    - Se ha usado la sentencia "with cacheLock:" para proteger los accesos a la caché y evitar conflictos entre hilos.
+    - Se puede consultar el contenido de la caché mediante el comando p.
+    - Se ha comprobado que, tras resolver una IP, esta aparece en la caché. Al repetir la petición inmediatamente no se genera tráfico ARP, mientras que al caducar la entrada se vuelve a realizar la petición.
 
 ---------------------
 Observaciones:
-    .Creación de una función extra: "gratuitousARP()"
-        - Esta función revisa si hay alguna IP duplicada
-        - Para evitar repeticiones de código al ser usado fuera de initARP, se decidió contener en una función.
-        - Se ha implementado la opción de leer desde el teclado para que el usuario pueda ejecutar esta funcionalidad en cualquier momento.
 
-    .Se ha utilizado el EtherType 0x0AA0 para el protocolo de mensajes Ethernet, siguiendo el enunciado de la práctica, aunque en el código inicial proporcionado figuraba 0x3003.
+    - Creación de una función extra: gratuitousARP()
+        - Esta función comprueba si hay alguna IP duplicada mediante peticiones ARP gratuitas.
+        - Para evitar repeticiones de código, al utilizarse tanto durante initARP como desde el programa principal, se decidió incluir esta funcionalidad en una función independiente.
+        - Se ha implementado la opción g para que el usuario pueda ejecutar esta comprobación en cualquier momento.
+        - Se ha probado configurando temporalmente h1 y h2 con la misma IP (10.0.0.1). El programa detectó el conflicto e impidió la inicialización de ARP en h2. Al restaurar su IP original, la inicialización volvió a funcionar correctamente.
 
+    - Se ha utilizado el EtherType 0x0AA0 para el protocolo de mensajes Ethernet, siguiendo el enunciado de la práctica, aunque en el código inicial proporcionado figuraba 0x3003.
 
+    - Las pruebas se han realizado utilizando Mininet con dos hosts (h1 y h2) conectados a un switch virtual, y Wireshark para comprobar las tramas Ethernet y los paquetes ARP enviados y recibidos.
