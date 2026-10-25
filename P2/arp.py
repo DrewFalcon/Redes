@@ -7,7 +7,7 @@
 
 
 
-from ethernet import *
+from P2.ethernet import *
 import logging
 import socket
 import struct

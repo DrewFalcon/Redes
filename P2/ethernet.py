@@ -5,7 +5,7 @@
     2019 EPS-UAM
 '''
 
-from rc1_pcap import *
+from P2.rc1_pcap import *
 import logging
 import socket
 import struct
@@ -23,6 +23,10 @@ TO_MS = 10
 broadcastAddr = bytes([0xFF]*6)
 #Diccionario que alamacena para un Ethertype dado qué función de callback se debe ejecutar
 EthernetProtocols = {}
+macAddress = None
+handle = None
+levelInitialized = False
+recvThread = None
 
 def getHwAddr(interface:str):
     '''
@@ -62,8 +66,15 @@ def process_Ethernet_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> 
         Retorno:
             -Ninguno
     '''
-    logging.debug('Trama nueva. Función no implementada')
-    #TODO: Implementar aquí el código que procesa una trama Ethernet en recepción
+    if len(data) < 14:
+        return
+    dstMac = data[0:6]
+    srcMac = data[6:12]
+    etherType = struct.unpack('!H', data[12:14])[0]
+    if dstMac != macAddress and dstMac != broadcastAddr:
+        return
+    if etherType in EthernetProtocols:
+        EthernetProtocols[etherType](us, header, data[14:], srcMac)
     
 
 def process_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> None:
@@ -128,7 +139,7 @@ def registerEthCallback(callback_func: Callable[[ctypes.c_void_p,pcap_pkthdr,byt
     '''
     global EthernetProtocols
     #EthernetProtocols es el diccionario que relaciona función de callback y ethertype
-    logging.debug('Función no implementada')
+    EthernetProtocols[ethertype] = callback_func
     
 
 def startEthernetLevel(interface:str) -> int:
@@ -146,16 +157,28 @@ def startEthernetLevel(interface:str) -> int:
         Retorno: 0 si todo es correcto, -1 en otro caso
     '''
     global macAddress,handle,levelInitialized,recvThread
-    handle = None
-    logging.debug('Función no implementada')
-    #TODO: implementar aquí la inicialización de la interfaz y de las variables globales
+    if levelInitialized:
+        return -1
+    try:
+        macAddress = getHwAddr(interface)
+        errbuf = bytearray()
+        handle = pcap_open_live(interface, ETH_FRAME_MAX, PROMISC, TO_MS, errbuf)
+        if handle is None:
+            logging.error('No se pudo abrir la interfaz: %s', errbuf)
+            return -1
 
-    #Una vez hemos abierto la interfaz para captura y hemos inicializado las variables globales (macAddress, handle y levelInitialized) arrancamos
-    #el hilo de recepción
-    recvThread = rxThread()
-    recvThread.daemon = True
-    recvThread.start()
-    return 0
+        #El hilo de recepción ya está implementado por el profesor
+        recvThread = rxThread()
+        recvThread.daemon = True
+        recvThread.start()
+        levelInitialized = True
+        return 0
+    except Exception as e:
+        logging.error('Error inicializando Ethernet: %s', e)
+        if handle is not None:
+            pcap_close(handle)
+        handle = None
+        return -1
 
 def stopEthernetLevel()->int:
     global macAddress,handle,levelInitialized,recvThread
@@ -169,9 +192,21 @@ def stopEthernetLevel()->int:
         Argumentos: Ninguno
         Retorno: 0 si todo es correcto y -1 en otro caso
     '''
-    logging.debug('Función no implementada')
+    if not levelInitialized:
+        return -1
+    recvThread.stop()
+    recvThread.join(timeout=2)
+    if recvThread.is_alive():
+        logging.error('El hilo receptor no ha terminado')
+        return -1
+    pcap_close(handle)
+    handle = None
+    macAddress = None
+    recvThread = None
+    levelInitialized = False
     return 0
     
+
 def sendEthernetFrame(data:bytes,length:int,etherType:int,dstMac:bytes) -> int:
     '''
         Nombre: sendEthernetFrame
@@ -190,6 +225,17 @@ def sendEthernetFrame(data:bytes,length:int,etherType:int,dstMac:bytes) -> int:
         Retorno: 0 si todo es correcto, -1 en otro caso
     '''
     global macAddress,handle
-    logging.debug('Función no implementada')
+    if not levelInitialized or handle is None or len(dstMac) != 6:
+        return -1
+    if length != len(data):
+        return -1
+    trama = dstMac + macAddress + struct.pack('!H', etherType) + data
+    if len(trama) > ETH_FRAME_MAX:
+        return -1
+    if len(trama) < ETH_FRAME_MIN:
+        trama += bytes(ETH_FRAME_MIN - len(trama))
+    if pcap_inject(handle, trama, len(trama)) != len(trama):
+        return -1
+    return 0
     
         
