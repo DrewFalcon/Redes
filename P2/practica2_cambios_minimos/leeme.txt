@@ -1,0 +1,21 @@
+PRACTICA 2 - REDES DE COMUNICACIONES - UAM
+
+Autores: Carlos Méndez y Andrés Falcón
+Grupo:
+Pareja:
+
+Implementaciones:
+
+1. Recibir tramas Ethernet, realizar comprobaciones y llamar correctamente a la función de callback de nivel superior
+2. Enviar tramas Ethernet  correctamente 
+3. Imprimir mensajes sobre el protocolo 0x07AA0
+4. Enviar correctamente peticiones ARP 
+5. Procesar correctamente peticiones ARP recibidas 
+6. Enviar correctamente respuestas ARP 
+7. Procesar correctamente respuestas ARP 
+8. Manejo correcto de la caché ARP
+
+OBSERVACIONES
+
+- Se ha utilizado el EtherType `0x0AA0` para el protocolo de mensajes Ethernet, siguiendo el enunciado de la práctica, 
+aunque en el código inicial proporcionado figuraba `0x3003`.
