@@ -18,7 +18,7 @@ Criterios de Evaluación
     - En sendEthernetFrame se construye la trama con los valores dstMac + macAddress + EtherType + payload.
     - Se comprueba que la trama cumpla los límites de Ethernet, añadiendo padding con ceros si es menor de 60 bytes y devolviendo error si supera los 1514 bytes.
     - Se envía dicha trama con pcap_inject y se comprueba que el número de bytes transmitidos sea el esperado.
-    - Se ha comprobado con Wireshark que las tramas tienen el formato y tamaño correctos. También se ha probado que una trama de 1515 bytes es rechazada.
+    - Se ha comprobado con Wireshark que las tramas tienen el formato y tamaño correctos.
 
 3. Imprimir mensajes sobre el protocolo 0x0AA0:
     - REALIZADO
