@@ -5,9 +5,9 @@
 	2020 EPS-UAM
 '''
 
-from P2.ethernet import *
-from P2.arp import *
-from P2.ethmsg import *
+from ethernet import *
+from arp import *
+from ethmsg import *
 import sys
 import binascii
 import signal

@@ -5,7 +5,7 @@
     2019 EPS-UAM
 '''
 
-from P2.rc1_pcap import *
+from rc1_pcap import *
 import logging
 import socket
 import struct
