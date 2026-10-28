@@ -5,7 +5,7 @@
     2024 EPS-UAM
 '''
 
-from ethernet import *
+from P3.materialP3.ethernet import *
 import logging
 import socket
 import struct

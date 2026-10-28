@@ -67,7 +67,7 @@ def sendUDPDatagram(data,dstPort,dstIP):
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
           
     '''
-    udp_datagram = bytes()
+udp_datagram = bytes()
 
 
 def initUDP():

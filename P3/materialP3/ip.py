@@ -5,7 +5,7 @@
     Autor: Javier Ramos <javier.ramos@uam.es>
     2022 EPS-UAM
 '''
-from ethernet import *
+from P3.materialP3.ethernet import *
 from arp import *
 from fcntl import ioctl
 import subprocess
