@@ -5,7 +5,7 @@
 	2020 EPS-UAM
 '''
 
-from P3.materialP3.ethernet import *
+from ethernet import *
 from arp import *
 from ethmsg import *
 import sys
